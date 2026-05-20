@@ -1,0 +1,82 @@
+@Entry
+@Component
+struct ExamplePage {
+    @State message: string = 'Hello World'
+    
+    build() {
+        Row() {
+            Column() {
+                Text(this.message)
+                    .fontSize(50)
+                    .fontWeight(FontWeight.Bold)
+                
+                Button('Click me')
+                    .onClick(() => {
+                        this.handleClick()
+                    })
+                
+                CustomComponent()
+            }
+            .width('100%')
+        }
+        .height('100%')
+    }
+    
+    handleClick() {
+        this.message = 'Button clicked!'
+        this.showToast()
+    }
+    
+    showToast() {
+        console.log('Toast shown')
+    }
+}
+
+@Component
+struct CustomComponent {
+    @State count: number = 0
+    
+    build() {
+        Column() {
+            Text(`Count: ${this.count}`)
+            Button('Increment')
+                .onClick(() => {
+                    this.increment()
+                })
+        }
+    }
+    
+    increment() {
+        this.count++
+        this.updateDisplay()
+    }
+    
+    updateDisplay() {
+        console.log('Display updated')
+    }
+}
+
+class DataManager {
+    private data: string[] = []
+    
+    constructor() {
+        this.initData()
+    }
+    
+    initData() {
+        this.data = ['item1', 'item2', 'item3']
+    }
+    
+    addItem(item: string) {
+        this.data.push(item)
+        this.saveData()
+    }
+    
+    saveData() {
+        console.log('Data saved:', this.data)
+    }
+    
+    getData() {
+        return this.data
+    }
+}
