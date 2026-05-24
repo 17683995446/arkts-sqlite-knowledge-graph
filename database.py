@@ -256,6 +256,11 @@ class CodeGraphDatabase:
         return full_result
 
     def optimize(self):
+        # VACUUM 和 ANALYZE 不能在事务内执行，先提交任何挂起的事务
+        try:
+            self.conn.commit()
+        except:
+            pass
         self.conn.execute('VACUUM')
         self.conn.execute('ANALYZE')
 

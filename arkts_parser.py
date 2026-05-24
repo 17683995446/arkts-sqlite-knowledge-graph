@@ -4,13 +4,15 @@ from file_scanner import calculate_file_hash
 
 class ArkTSParser:
     def __init__(self):
-        # 优化正则表达式，避免回溯
-        self.class_pattern = re.compile(r'\b(?:class|struct)\s+(\w+)')
-        # 使用非贪婪匹配和更精确的模式
-        self.method_pattern = re.compile(r'\b(?:public|private|protected)?\s*(?:async\s+)?(\w+)\s*\([^)]{0,1000}?\)\s*(?::\s*\w+)?\s*\{')
-        self.call_pattern = re.compile(r'\b(\w+)\s*\(')
+        # 优化正则表达式，避免回溯，限制标识符长度
+        self.class_pattern = re.compile(r'\b(?:class|struct)\s+(\w{1,200})')
+        self.method_pattern = re.compile(r'\b(?:public|private|protected)?\s*(?:async\s+)?(\w{1,200})\s*\([^)]{0,500}?\)\s*(?::\s*\w+)?\s*\{')
+        self.call_pattern = re.compile(r'\b(\w{1,200})\s*\(')
         self.MAX_LINE_LENGTH = 10000  # 最大行长度限制
-        self.MAX_METHOD_PARAM_LENGTH = 1000  # 方法参数最大长度
+        self.MAX_METHOD_PARAM_LENGTH = 500  # 方法参数最大长度
+        self.MAX_FILE_LINES = 5000  # 最大文件行数限制
+        self.MAX_NESTING_DEPTH = 50  # 最大嵌套深度限制
+        self.MAX_IDENTIFIER_LENGTH = 200  # 最大标识符长度
         
         self.keywords = [
             'if', 'for', 'while', 'switch', 'try', 'catch', 'finally',
@@ -88,7 +90,8 @@ class ArkTSParser:
         lines = content.split('\n')
         processed_lines = []
         
-        for line in lines:
+        # 限制总行数
+        for line in lines[:self.MAX_FILE_LINES]:
             if len(line) > self.MAX_LINE_LENGTH:
                 processed_line = line[:self.MAX_LINE_LENGTH]
                 processed_lines.append(processed_line)
@@ -99,19 +102,14 @@ class ArkTSParser:
     
     def _remove_comments(self, content: str) -> str:
         """移除单行和多行注释"""
-        # 移除多行注释 /* ... */
         content = re.sub(r'/\*[\s\S]*?\*/', '', content)
-        # 移除单行注释 //
         content = re.sub(r'//[^\n]*', '', content)
         return content
     
     def _remove_strings(self, content: str) -> str:
         """移除字符串字面量，避免误识别"""
-        # 移除双引号字符串
         content = re.sub(r'"(?:[^"\\]|\\.)*"', '""', content)
-        # 移除单引号字符串
         content = re.sub(r"'(?:[^'\\]|\\.)*'", "''", content)
-        # 移除模板字符串 `
         content = re.sub(r'`(?:[^`\\]|\\.)*`', '``', content)
         return content
 
@@ -121,7 +119,8 @@ class ArkTSParser:
         matches = self.class_pattern.finditer(content)
         for match in matches:
             name = match.group(1)
-            if name and name not in self.keywords and name not in seen:
+            # 限制标识符长度
+            if name and name not in self.keywords and name not in seen and len(name) <= self.MAX_IDENTIFIER_LENGTH:
                 seen.add(name)
                 classes.append({'name': name})
         return classes
@@ -144,7 +143,8 @@ class ArkTSParser:
         seen_methods = set()
         for match in matches:
             method_name = match.group(1)
-            if not method_name or method_name in self.keywords:
+            # 限制标识符长度
+            if not method_name or method_name in self.keywords or len(method_name) > self.MAX_IDENTIFIER_LENGTH:
                 continue
             
             method_start = match.start()
@@ -165,9 +165,15 @@ class ArkTSParser:
         
         return methods
 
-    def _extract_calls(self, content: str, methods: List[Dict], file_path: str) -> List[Dict]:
+    def _extract_calls(self, content: str, methods: List[Dict], file_path: str, all_methods: List[Dict] = None) -> List[Dict]:
         calls = []
         method_names = [m['name'] for m in methods]
+        
+        # 如果提供了所有方法列表，使用它；否则只使用当前文件的方法
+        if all_methods is not None:
+            known_methods = set(m['name'] for m in all_methods)
+        else:
+            known_methods = set(method_names)
         
         if not method_names:
             return []
@@ -187,14 +193,19 @@ class ArkTSParser:
             
             stack = []
             caller_end = len(content)
+            nesting_depth = 0
             i = content.find('{', caller_start)
             if i == -1:
                 continue
             
             stack.append('{')
-            for j in range(i + 1, len(content)):
+            nesting_depth = 1
+            for j in range(i + 1, min(len(content), i + 10000)):  # 限制搜索范围
                 if content[j] == '{':
                     stack.append('{')
+                    nesting_depth += 1
+                    if nesting_depth > self.MAX_NESTING_DEPTH:
+                        break
                 elif content[j] == '}':
                     stack.pop()
                     if not stack:
@@ -206,9 +217,10 @@ class ArkTSParser:
             
             for call_match in call_matches:
                 callee_name = call_match.group(1)
-                if (callee_name in method_names 
+                if (callee_name in known_methods 
                     and callee_name != caller_name 
                     and callee_name not in self.keywords
+                    and len(callee_name) <= self.MAX_IDENTIFIER_LENGTH
                     and (caller_name, callee_name) not in seen_pairs):
                     seen_pairs.add((caller_name, callee_name))
                     calls.append({
@@ -235,14 +247,19 @@ class ArkTSParser:
             
             stack = []
             class_end = len(content)
+            nesting_depth = 0
             i = content.find('{', class_start)
             if i == -1:
                 continue
             
             stack.append('{')
-            for j in range(i + 1, len(content)):
+            nesting_depth = 1
+            for j in range(i + 1, min(len(content), i + 10000)):
                 if content[j] == '{':
                     stack.append('{')
+                    nesting_depth += 1
+                    if nesting_depth > self.MAX_NESTING_DEPTH:
+                        break
                 elif content[j] == '}':
                     stack.pop()
                     if not stack:
@@ -256,6 +273,7 @@ class ArkTSParser:
                 child_name = child_cls['name']
                 if (child_name != parent_name 
                     and child_name in class_content 
+                    and len(child_name) <= self.MAX_IDENTIFIER_LENGTH
                     and (parent_name, child_name) not in seen):
                     seen.add((parent_name, child_name))
                     components.append({
