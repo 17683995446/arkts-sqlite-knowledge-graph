@@ -9,7 +9,7 @@ import json
 import requests
 
 # 使用提供的GitHub Personal Access Token
-GITHUB_TOKEN = "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"
+GITHUB_TOKEN = "REDACTED_GITHUB_TOKEN"
 GITHUB_USERNAME = "2358384171"  # 从邮箱推断
 
 # 仓库信息

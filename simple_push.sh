@@ -7,7 +7,7 @@ echo "==========================================================================
 # 仓库信息
 REPO_NAME="arkts-sqlite-knowledge-graph"
 USER_NAME="2358384171"
-PAT="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"
+PAT="REDACTED_GITHUB_TOKEN"
 
 echo "1. 添加远程仓库..."
 git remote add origin https://github.com/$USER_NAME/$REPO_NAME.git 2>/dev/null || git remote set-url origin https://github.com/$USER_NAME/$REPO_NAME.git

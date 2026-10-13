@@ -4,7 +4,7 @@ echo "==========================================================================
 echo "使用GitHub API创建私有仓库"
 echo "=================================================================================="
 
-PAT="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"
+PAT="REDACTED_GITHUB_TOKEN"
 USER_NAME="2358384171"
 REPO_NAME="arkts-sqlite-knowledge-graph"
 

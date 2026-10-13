@@ -204,7 +204,7 @@ git push -u origin main
 ```
 或使用Personal Access Token：
 ```bash
-git push -u "https://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@github.com/2358384171/arkts-sqlite-knowledge-graph.git" main
+git push -u "https://REDACTED_GITHUB_TOKEN@github.com/2358384171/arkts-sqlite-knowledge-graph.git" main
 ```
 
 ---
